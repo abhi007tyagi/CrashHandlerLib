@@ -1,5 +1,6 @@
 package com.tyagiabhinav.crashhandler;
 
+import android.app.Activity;
 import android.app.AlarmManager;
 import android.app.Application;
 import android.app.PendingIntent;
@@ -8,7 +9,7 @@ import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.os.Build;
-import android.os.Environment;
+import android.support.v4.app.ActivityCompat;
 import android.util.Log;
 
 import java.io.File;
@@ -26,7 +27,7 @@ import java.util.concurrent.TimeUnit;
  * Created by abhinavtyagi on 12/10/16.
  */
 
-public class CrashHandler implements UncaughtExceptionHandler {
+public class CrashHandler extends ActivityCompat implements UncaughtExceptionHandler {
 
     private final static String TAG = "CrashHandler";
 
@@ -34,38 +35,73 @@ public class CrashHandler implements UncaughtExceptionHandler {
     private final static long EXPIRY_TIME = TimeUnit.DAYS.toMillis(7);
 
     /* get DateFormatter for current locale */
-    private final static DateFormat FORMATTER = DateFormat.getDateInstance();
+    private final static DateFormat FORMATTER = DateFormat.getDateTimeInstance();
 
     private static final String LINE_SEPARATOR = "\n";
     public static final String ERROR_REPORT = "error_report";
     public static final String APP_NAME = "app_name";
     public static final String ERROR = "error";
     public static final String ALERT_MESSAGE = "alert_msg";
+    public static final String IS_HTML_MESSAGE = "alert_html_msg";
     public static final String EMAIL_ADD = "email_add";
+    public static final String REPORT_TO_URL = "report_to_url";
+    public static final String CALLBACK_ACTIVITY = "callback_activity";
+    public static final String CALLBACK_BUTTON_TEXT = "callback_btn_text";
+    public static final String BACKGROUND_DRAWABLE = "background";
+    public static final String SHOW_STACKTRACE = "show_stacktrace";
+    public static final String ERROR_REPORT_FILE_PATH = "err_report_file_path";
 
     private volatile boolean isCrashing = false;
     private Context context;
-    private Class exceptionActivity;
+    private Class<? extends Activity> exceptionActivity;
+    private Class<? extends Activity> callbackActivity;
+    private String callbackActivityBtnText;
+    private int background;
     private String alertMessage;
+    private boolean isHTMLMessage;
+    private boolean showStackTrace;
     private String emailAdd;
+    private String reportToURL;
 
 
     public static CrashHandler init(Application application) {
         return new CrashHandler(application);
     }
 
-    public CrashHandler exceptionActivity(Class activity) {
+    public CrashHandler exceptionActivity(Class<? extends Activity> activity) {
         this.exceptionActivity = activity;
         return this;
     }
 
-    public CrashHandler alertMessage(String msg) {
-        this.alertMessage = msg;
+    public CrashHandler callbackActivity(Class<? extends Activity> activity, String btnText) {
+        this.callbackActivity = activity;
+        this.callbackActivityBtnText = btnText;
         return this;
     }
 
-    public CrashHandler email(String email) {
+    public CrashHandler background(int drawable) {
+        this.background = drawable;
+        return this;
+    }
+
+    public CrashHandler alertMessage(String msg, boolean htmlMSG) {
+        this.alertMessage = msg;
+        this.isHTMLMessage = htmlMSG;
+        return this;
+    }
+
+    public CrashHandler showStackTraceReport(boolean show) {
+        this.showStackTrace = show;
+        return this;
+    }
+
+    public CrashHandler emailTo(String email) {
         this.emailAdd = email;
+        return this;
+    }
+
+    private CrashHandler reportToURL(String url) {
+        this.reportToURL = url;
         return this;
     }
 
@@ -74,7 +110,8 @@ public class CrashHandler implements UncaughtExceptionHandler {
         // set default values
         this.context = context;
         this.exceptionActivity = ExceptionActivity.class;
-        this.alertMessage = context.getString(R.string.exceptionLabel);
+        this.background = -1;
+        this.alertMessage = context.getString(R.string.alertMsg);
 
         //delete old logs
         deleteLogs(EXPIRY_TIME);
@@ -134,21 +171,30 @@ public class CrashHandler implements UncaughtExceptionHandler {
         errorReport.append(Build.VERSION.INCREMENTAL);
         errorReport.append(LINE_SEPARATOR);
 
-        saveToFile(errorReport.toString());
+        String errorFile = saveToFile(errorReport.toString());
+
 
         Intent errorIntent = new Intent(context, exceptionActivity);
         errorIntent.putExtra(ERROR_REPORT, errorReport.toString());
         errorIntent.putExtra(APP_NAME, getApplicationName(context));
         errorIntent.putExtra(ALERT_MESSAGE, alertMessage);
+        errorIntent.putExtra(IS_HTML_MESSAGE, isHTMLMessage);
         errorIntent.putExtra(EMAIL_ADD, emailAdd);
+        errorIntent.putExtra(REPORT_TO_URL, reportToURL);
+        errorIntent.putExtra(CALLBACK_ACTIVITY, (callbackActivity == null) ? null : callbackActivity.getName());
+        errorIntent.putExtra(CALLBACK_BUTTON_TEXT, callbackActivityBtnText);
+        errorIntent.putExtra(BACKGROUND_DRAWABLE, background);
+        errorIntent.putExtra(SHOW_STACKTRACE, showStackTrace);
+        errorIntent.putExtra(ERROR_REPORT_FILE_PATH, (errorFile == null) ? null : errorFile);
         errorIntent.putExtra(ERROR, throwable);
 
-        PendingIntent myActivity = PendingIntent.getActivity(context, 30006, errorIntent, PendingIntent.FLAG_ONE_SHOT);
+        PendingIntent pendingActivityIntent = PendingIntent.getActivity(context, 30006, errorIntent, PendingIntent.FLAG_ONE_SHOT);
 
-        AlarmManager alarmManager;
-        alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-        alarmManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP, 7000, myActivity);
-        System.exit(2);
+        AlarmManager alarmActivityManager;
+        alarmActivityManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+        alarmActivityManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP, 7000, pendingActivityIntent);
+
+        System.exit(0);
 
         // re-throw critical exception further to the os (important)
         this.uncaughtException(thread, throwable);
@@ -161,7 +207,7 @@ public class CrashHandler implements UncaughtExceptionHandler {
      *
      * @param timeout outdated time
      */
-    public void deleteLogs(final long timeout) {
+    private void deleteLogs(final long timeout) {
         final File logDir = new File(getCrashDir());
         try {
             final long currTime = System.currentTimeMillis();
@@ -184,14 +230,14 @@ public class CrashHandler implements UncaughtExceptionHandler {
 
 
     private String getCrashDir() {
-        String rootPath = Environment.getExternalStorageDirectory().getPath();
+        String rootPath = context.getFilesDir().getPath();
         return rootPath + "/CrashHandler/";
     }
 
 
-    private boolean saveToFile(String errorLog) {
+    private String saveToFile(String errorLog) {
         String time = FORMATTER.format(new Date());
-        String fileName = "Error--" + time + ".log";
+        String fileName = "Error_" + time + ".log";
 
         String crashDir = getCrashDir();
         String crashPath = crashDir + fileName;
@@ -204,7 +250,7 @@ public class CrashHandler implements UncaughtExceptionHandler {
                 new File(crashDir).mkdirs();
                 file.createNewFile();
             } catch (IOException e) {
-                return false;
+                return null;
             }
         }
 
@@ -212,12 +258,12 @@ public class CrashHandler implements UncaughtExceptionHandler {
         try {
             writer = new PrintWriter(file);
         } catch (FileNotFoundException e) {
-            return false;
+            return null;
         }
         writer.write(errorLog);
         writer.close();
 
-        return true;
+        return file.toString();
     }
 
 
@@ -226,7 +272,7 @@ public class CrashHandler implements UncaughtExceptionHandler {
      *
      * @param file path to delete.
      */
-    public void delete(File file) {
+    private void delete(File file) {
         delete(file, false);
     }
 

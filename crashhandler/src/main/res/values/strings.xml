@@ -1,5 +1,7 @@
 <resources>
     <string name="app_name">CrashHandler</string>
     <string name="exceptionLabel">Unknown Error Occurred</string>
+    <string name="alertMsg">We regret for the inconvenience.</string>
     <string name="btnReport">Report</string>
+    <string name="btnEmail">Email</string>
 </resources>
