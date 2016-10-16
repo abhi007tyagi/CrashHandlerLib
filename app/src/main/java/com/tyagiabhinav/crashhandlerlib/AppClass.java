@@ -14,10 +14,9 @@ public class AppClass extends Application {
     public void onCreate() {
         super.onCreate();
         CrashHandler.init(this)
-                .emailTo("abhi007tyagi@gmail.com")
                 .alertMessage("Please help us improve by reporting the issue.", false)
-                .showStackTraceReport(true)
-//                .reportToURL("http://abhinavtyagi.byethost10.com/uploadTest/uploadServer.php")
+                .showStackTraceReport(false)
+                .reportToURL("http://10.0.2.2:8080/FileUpload/UploadServlet")
                 .background(R.mipmap.ic_launcher);
 
     }

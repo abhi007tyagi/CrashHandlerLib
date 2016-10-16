@@ -100,7 +100,7 @@ public class CrashHandler extends ActivityCompat implements UncaughtExceptionHan
         return this;
     }
 
-    private CrashHandler reportToURL(String url) {
+    public CrashHandler reportToURL(String url) {
         this.reportToURL = url;
         return this;
     }

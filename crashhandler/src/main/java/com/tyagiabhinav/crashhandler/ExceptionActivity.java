@@ -18,7 +18,7 @@ import static com.tyagiabhinav.crashhandler.CrashHandler.REPORT_TO_URL;
 
 public class ExceptionActivity extends AppCompatActivity {
 
-    private static final String TAG = ExceptionActivity.class.getSimpleName();
+    private static final String TAG = "CrashHandler." + ExceptionActivity.class.getSimpleName();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -116,6 +116,7 @@ public class ExceptionActivity extends AppCompatActivity {
                     emailIntent.setType("*/*");
                     emailIntent.putExtra(Intent.EXTRA_SUBJECT, appName + " Error Report");
                     startActivity(Intent.createChooser(emailIntent, "Send email..."));
+                    finish();
                 }
             });
         }
@@ -138,24 +139,14 @@ public class ExceptionActivity extends AppCompatActivity {
                 @Override
                 public void onClick(View v) {
                     Log.d(TAG, "onClick.. Report");
-
                     // start background service to upload report to server
-                    UploadReportAsyncTask task = new UploadReportAsyncTask(ExceptionActivity.this, errorFile, reportToURL);
-                    task.execute();
+                    Intent uploadIntent = new Intent(ExceptionActivity.this, UploadReportIntentService.class);
+                    uploadIntent.putExtra(REPORT_TO_URL, reportToURL);
+                    uploadIntent.putExtra(ERROR_REPORT_FILE_PATH, (errorFile == null) ? null : errorFile);
 
-
-//                    Intent uploadIntent = new Intent(ExceptionActivity.this, UploadReportIntentService.class);
-//                    uploadIntent.putExtra(REPORT_TO_URL, reportToURL);
-//                    uploadIntent.putExtra(ERROR_REPORT_FILE_PATH, (errorFile == null) ? null : errorFile);
-//
-//                    Log.d(TAG, "starting upload service...");
-//                    startService(uploadIntent);
-//                    PendingIntent pendingServiceIntent = PendingIntent.getService(ExceptionActivity.this, 60003, uploadIntent, PendingIntent.FLAG_ONE_SHOT);
-//
-//                    AlarmManager alarmServiceManager;
-//                    alarmServiceManager = (AlarmManager) ExceptionActivity.this.getSystemService(Context.ALARM_SERVICE);
-//                    alarmServiceManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP, 9000, pendingServiceIntent);
-//                        finish();
+                    Log.d(TAG, "starting upload service...");
+                    startService(uploadIntent);
+                    finish();
                 }
             });
         }
