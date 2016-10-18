@@ -63,56 +63,109 @@ public class CrashHandler extends ActivityCompat implements UncaughtExceptionHan
     private String emailAdd;
     private String reportToURL;
 
+    public CrashHandler(CrashHandler build) {
+    }
+
+
+    public static class Configuration {
+
+        private Context context;
+        private Class<? extends Activity> exceptionActivity;
+        private Class<? extends Activity> callbackActivity;
+        private String callbackActivityBtnText;
+        private int background;
+        private String alertMessage;
+        private boolean isHTMLMessage;
+        private boolean showStackTrace;
+        private String emailAdd;
+        private String reportToURL;
+
+
+        public Configuration(Application application) {
+            this.context = application;
+
+            // default settings
+            this.exceptionActivity = ExceptionActivity.class;
+            this.background = -1;
+            this.alertMessage = context.getString(R.string.alertMsg);
+        }
+
+        public Configuration exceptionActivity(Class<? extends Activity> activity) {
+            this.exceptionActivity = activity;
+            return this;
+        }
+
+        public Configuration callbackActivity(Class<? extends Activity> activity, String btnText) {
+            this.callbackActivity = activity;
+            this.callbackActivityBtnText = btnText;
+            return this;
+        }
+
+        public Configuration background(int drawable) {
+            this.background = drawable;
+            return this;
+        }
+
+        public Configuration alertMessage(String msg, boolean htmlMSG) {
+            this.alertMessage = msg;
+            this.isHTMLMessage = htmlMSG;
+            return this;
+        }
+
+        public Configuration showStackTraceReport(boolean show) {
+            this.showStackTrace = show;
+            return this;
+        }
+
+        public Configuration emailTo(String email) {
+            this.emailAdd = email;
+            return this;
+        }
+
+        public Configuration reportToURL(String url) {
+            this.reportToURL = url;
+            return this;
+        }
+
+    }
 
     public static CrashHandler init(Application application) {
         return new CrashHandler(application);
     }
 
-    public CrashHandler exceptionActivity(Class<? extends Activity> activity) {
-        this.exceptionActivity = activity;
-        return this;
+    public static CrashHandler init(Configuration config) {
+        return new CrashHandler(config);
     }
 
-    public CrashHandler callbackActivity(Class<? extends Activity> activity, String btnText) {
-        this.callbackActivity = activity;
-        this.callbackActivityBtnText = btnText;
-        return this;
-    }
+    private CrashHandler(Application application) {
+        this.context = application;
 
-    public CrashHandler background(int drawable) {
-        this.background = drawable;
-        return this;
-    }
-
-    public CrashHandler alertMessage(String msg, boolean htmlMSG) {
-        this.alertMessage = msg;
-        this.isHTMLMessage = htmlMSG;
-        return this;
-    }
-
-    public CrashHandler showStackTraceReport(boolean show) {
-        this.showStackTrace = show;
-        return this;
-    }
-
-    public CrashHandler emailTo(String email) {
-        this.emailAdd = email;
-        return this;
-    }
-
-    public CrashHandler reportToURL(String url) {
-        this.reportToURL = url;
-        return this;
-    }
-
-
-    private CrashHandler(Context context) {
-        // set default values
-        this.context = context;
+        // default settings
         this.exceptionActivity = ExceptionActivity.class;
         this.background = -1;
         this.alertMessage = context.getString(R.string.alertMsg);
 
+        setup();
+    }
+
+
+    private CrashHandler(Configuration config) {
+        // set default values
+        this.context = config.context;
+        this.exceptionActivity = config.exceptionActivity;
+        this.callbackActivity = config.callbackActivity;
+        this.callbackActivityBtnText = config.callbackActivityBtnText;
+        this.background = config.background;
+        this.alertMessage = config.alertMessage;
+        this.isHTMLMessage = config.isHTMLMessage;
+        this.showStackTrace = config.showStackTrace;
+        this.emailAdd = config.emailAdd;
+        this.reportToURL = config.reportToURL;
+
+        setup();
+    }
+
+    private void setup() {
         //delete old logs
         deleteLogs(EXPIRY_TIME);
 
@@ -174,7 +227,7 @@ public class CrashHandler extends ActivityCompat implements UncaughtExceptionHan
         String errorFile = saveToFile(errorReport.toString());
 
 
-        Intent errorIntent = new Intent(context, exceptionActivity);
+        Intent errorIntent = new Intent(context, (exceptionActivity == null) ? ExceptionActivity.class : exceptionActivity);
         errorIntent.putExtra(ERROR_REPORT, errorReport.toString());
         errorIntent.putExtra(APP_NAME, getApplicationName(context));
         errorIntent.putExtra(ALERT_MESSAGE, alertMessage);
